@@ -14,7 +14,7 @@ import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 
 /**
- *
+ * <p>Dynamic Connection Pooling, similar to ADO.NET</p>
  * @author mnacey
  */
 public class DynamicConnectionPool {
