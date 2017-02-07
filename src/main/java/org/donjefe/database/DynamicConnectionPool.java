@@ -9,8 +9,6 @@ import java.sql.Connection;
 import java.sql.PreparedStatement;
 import java.sql.ResultSet;
 import java.sql.SQLException;
-import java.util.HashMap;
-import java.util.Map;
 import org.apache.commons.dbcp2.BasicDataSource;
 
 /**
@@ -18,39 +16,6 @@ import org.apache.commons.dbcp2.BasicDataSource;
  * @author mnacey
  */
 public class DynamicConnectionPool {
-    private volatile Map<Integer,BasicDataSource> connectionPools;
-    
-    public DynamicConnectionPool () {
-        connectionPools = new HashMap<>();
-        
-    }
-    
-    public BasicDataSource getConnectionPool (String connectionUrl, String user, 
-            String password) {
-        int connectionHash = getConnectionHash (connectionUrl, user, password);
-        
-        if (connectionPools.containsKey(connectionHash)) {
-            return connectionPools.get(connectionHash);
-        } else {
-            BasicDataSource ds = new BasicDataSource();
-            ds.setUrl(connectionUrl);
-            ds.setUsername(user);
-            ds.setPassword(password);
-            
-            ds.setMinIdle(5);
-            ds.setMaxIdle(10);
-            ds.setMaxOpenPreparedStatements(100);
-            
-            connectionPools.put(connectionHash, ds);
-            return ds;
-        }
-    }
-    
-    public int getConnectionHash (String connectionUrl, String user, 
-            String password) {
-        String combo = connectionUrl.concat(user).concat(password);
-        return combo.hashCode();
-    }
     
     private static void doQuery (Connection conn) throws SQLException {
         PreparedStatement stmt = conn.prepareStatement("SELECT * FROM account");
@@ -61,17 +26,35 @@ public class DynamicConnectionPool {
         }
     }
     
+    public static BasicDataSource createDataSource (ConnectionConfig config) {
+        
+        BasicDataSource ds = new BasicDataSource();
+        ds.setUrl(config.dbUrl);
+        ds.setUsername(config.dbUser);
+        ds.setPassword(config.dbPassword);
+        
+        ds.setMinIdle(5);
+        ds.setMaxIdle(10);
+        ds.setMaxOpenPreparedStatements(100);
+        
+        return ds;
+    }
+    
     public static void main (String [] args) throws SQLException {
-        DynamicConnectionPool dcp = new DynamicConnectionPool();
         String dbUrl = "jdbc:mysql://localhost/test";
         String dbUser = "root";
         String dbPass = "bohica";
- 
+        
+        ConnectionConfig config = new ConnectionConfig();
+        config.dbUrl = dbUrl;
+        config.dbUser = dbUser;
+        config.dbPassword = dbPass;
+        
         try {
-            try (Connection conn1 = dcp.getConnectionPool(dbUrl, dbUser, dbPass).getConnection()) {
+            try (Connection conn1 = ConnectionPoolManager.getConnection(config.getHash(), DynamicConnectionPool::createDataSource, config)) {
                 doQuery(conn1);
             }
-            try (Connection conn2 = dcp.getConnectionPool(dbUrl, dbUser, dbPass).getConnection()) {
+            try (Connection conn2 = ConnectionPoolManager.getConnection(config.getHash(), DynamicConnectionPool::createDataSource, config)) {
                 doQuery(conn2);
             }
         } catch (SQLException ex) {
